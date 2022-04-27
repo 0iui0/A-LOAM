@@ -280,12 +280,13 @@ int main(int argc, char **argv)
                     corner_correspondence = 0;
                     plane_correspondence = 0;
 
-                    //ceres::LossFunction *loss_function = NULL;
+                    // ceres求解
+                    // 设置损失函数
                     ceres::LossFunction *loss_function = new ceres::HuberLoss(0.1);
                     ceres::LocalParameterization *q_parameterization =
                         new ceres::EigenQuaternionParameterization();
                     ceres::Problem::Options problem_options;
-
+                    // 1。优化变量（para_q para_t）
                     ceres::Problem problem(problem_options);
                     problem.AddParameterBlock(para_q, 4, q_parameterization);
                     problem.AddParameterBlock(para_t, 3);
@@ -295,18 +296,19 @@ int main(int argc, char **argv)
                     std::vector<float> pointSearchSqDis;
 
                     TicToc t_data;
-                    // find correspondence for corner features
+                    // find correspondence for corner features E_hat{k+1}选择i，kdtree最近邻从E{K}选j、k（j和k在相邻激光束）
                     for (int i = 0; i < cornerPointsSharpNum; ++i)
                     {
                         TransformToStart(&(cornerPointsSharp->points[i]), &pointSel);
                         kdtreeCornerLast->nearestKSearch(pointSel, 1, pointSearchInd, pointSearchSqDis);
 
                         int closestPointInd = -1, minPointInd2 = -1;
+                        // 选取相邻扫描线中最近的点，这样的目的是防止三点共线而无法构成三角形
                         if (pointSearchSqDis[0] < DISTANCE_SQ_THRESHOLD)
                         {
                             closestPointInd = pointSearchInd[0];
                             int closestPointScanID = int(laserCloudCornerLast->points[closestPointInd].intensity);
-
+                            // De
                             double minPointSqDis2 = DISTANCE_SQ_THRESHOLD;
                             // search in the direction of increasing scan line
                             for (int j = closestPointInd + 1; j < (int)laserCloudCornerLast->points.size(); ++j)
@@ -377,13 +379,14 @@ int main(int argc, char **argv)
                                 s = (cornerPointsSharp->points[i].intensity - int(cornerPointsSharp->points[i].intensity)) / SCAN_PERIOD;
                             else
                                 s = 1.0;
+                            // 2.1。边角点残差
                             ceres::CostFunction *cost_function = LidarEdgeFactor::Create(curr_point, last_point_a, last_point_b, s);
                             problem.AddResidualBlock(cost_function, loss_function, para_q, para_t);
                             corner_correspondence++;
                         }
                     }
 
-                    // find correspondence for plane features
+                    // find correspondence for plane features H_hat{k+1}选择i，kdtree最近邻从H{k}选择j，l，m （j和l共激光束，m在相邻激光束）
                     for (int i = 0; i < surfPointsFlatNum; ++i)
                     {
                         TransformToStart(&(surfPointsFlat->points[i]), &pointSel);
@@ -396,6 +399,7 @@ int main(int argc, char **argv)
 
                             // get closest point's scan ID
                             int closestPointScanID = int(laserCloudSurfLast->points[closestPointInd].intensity);
+                            // Dh
                             double minPointSqDis2 = DISTANCE_SQ_THRESHOLD, minPointSqDis3 = DISTANCE_SQ_THRESHOLD;
 
                             // search in the direction of increasing scan line
@@ -475,6 +479,7 @@ int main(int argc, char **argv)
                                     s = (surfPointsFlat->points[i].intensity - int(surfPointsFlat->points[i].intensity)) / SCAN_PERIOD;
                                 else
                                     s = 1.0;
+                                // 2.2。平面点残差
                                 ceres::CostFunction *cost_function = LidarPlaneFactor::Create(curr_point, last_point_a, last_point_b, last_point_c, s);
                                 problem.AddResidualBlock(cost_function, loss_function, para_q, para_t);
                                 plane_correspondence++;
@@ -492,6 +497,7 @@ int main(int argc, char **argv)
 
                     TicToc t_solver;
                     ceres::Solver::Options options;
+                    // 3。求解 QR方法
                     options.linear_solver_type = ceres::DENSE_QR;
                     options.max_num_iterations = 4;
                     options.minimizer_progress_to_stdout = false;
@@ -500,7 +506,7 @@ int main(int argc, char **argv)
                     printf("solver time %f ms \n", t_solver.toc());
                 }
                 printf("optimization twice time %f \n", t_opt.toc());
-
+                // 对求出来的姿态矩阵进行迭代和优化
                 t_w_curr = t_w_curr + q_w_curr * t_last_curr;
                 q_w_curr = q_w_curr * q_last_curr;
             }

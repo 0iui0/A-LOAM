@@ -138,13 +138,13 @@ ros::Publisher pubLaserCloudSurround, pubLaserCloudMap, pubLaserCloudFullRes, pu
 
 nav_msgs::Path laserAfterMappedPath;
 
-// set initial guess
+// set initial guess 设置初始的姿态
 void transformAssociateToMap()
 {
 	q_w_curr = q_wmap_wodom * q_wodom_curr;
 	t_w_curr = q_wmap_wodom * t_wodom_curr + t_wmap_wodom;
 }
-
+// 经过计算后，得到的新的姿态信息
 void transformUpdate()
 {
 	q_wmap_wodom = q_w_curr * q_wodom_curr.inverse();
@@ -319,7 +319,7 @@ void process()
 				centerCubeJ--;
 			if (t_w_curr.z() + 25.0 < 0)
 				centerCubeK--;
-
+            // [3,laserCloudCenWidth-3]中不动，只动区间外的
 			while (centerCubeI < 3)
 			{
 				for (int j = 0; j < laserCloudHeight; j++)
@@ -381,7 +381,7 @@ void process()
 				centerCubeI--;
 				laserCloudCenWidth--;
 			}
-
+            // [3,laserCloudCenHeight-3]中不动，只动区间外的
 			while (centerCubeJ < 3)
 			{
 				for (int i = 0; i < laserCloudWidth; i++)
@@ -443,7 +443,7 @@ void process()
 				centerCubeJ--;
 				laserCloudCenHeight--;
 			}
-
+            // [3,laserCloudCenDepth-3]中不动，只动区间外的
 			while (centerCubeK < 3)
 			{
 				for (int i = 0; i < laserCloudWidth; i++)
@@ -862,6 +862,7 @@ void process()
 			odomAftMapped.pose.pose.position.x = t_w_curr.x();
 			odomAftMapped.pose.pose.position.y = t_w_curr.y();
 			odomAftMapped.pose.pose.position.z = t_w_curr.z();
+            // 最终传递的是优化计算后得到的t_w_curr和q_w_curr
 			pubOdomAftMapped.publish(odomAftMapped);
 
 			geometry_msgs::PoseStamped laserAfterMappedPose;
