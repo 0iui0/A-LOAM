@@ -8,7 +8,7 @@
 #include <pcl/point_types.h>
 #include <pcl/kdtree/kdtree_flann.h>
 #include <pcl_conversions/pcl_conversions.h>
-
+// 点到面的残差距离
 struct LidarEdgeFactor
 {
 	LidarEdgeFactor(Eigen::Vector3d curr_point_, Eigen::Vector3d last_point_a_,
@@ -26,9 +26,12 @@ struct LidarEdgeFactor
 		//Eigen::Quaternion<T> q_last_curr{q[3], T(s) * q[0], T(s) * q[1], T(s) * q[2]};
 		Eigen::Quaternion<T> q_last_curr{q[3], q[0], q[1], q[2]};
 		Eigen::Quaternion<T> q_identity{T(1), T(0), T(0), T(0)};
+        // 运动补偿
 		q_last_curr = q_identity.slerp(T(s), q_last_curr);
 		Eigen::Matrix<T, 3, 1> t_last_curr{T(s) * t[0], T(s) * t[1], T(s) * t[2]};
 
+        // Odometry线程时，下面是将当前帧L系下的cp转换到上一帧L系下。在上一帧L系下计算点到线的距离残差
+        // Mapping线程时，下面是将当前帧L系下的cp转换到W系下。在W系下计算点到线的距离残差
 		Eigen::Matrix<T, 3, 1> lp;
 		lp = q_last_curr * cp + t_last_curr;
 
@@ -47,13 +50,18 @@ struct LidarEdgeFactor
 	{
 		return (new ceres::AutoDiffCostFunction<
 				LidarEdgeFactor, 3, 4, 3>(
+                        //       ^  ^  ^
+                        //维度    ｜ ｜ ｜
+                        //残差-----  ｜ ｜
+                        //优化变量q---  ｜
+                        //优化变量t------
 			new LidarEdgeFactor(curr_point_, last_point_a_, last_point_b_, s_)));
 	}
 
 	Eigen::Vector3d curr_point, last_point_a, last_point_b;
 	double s;
 };
-
+// Odometry中点到面的残差距离
 struct LidarPlaneFactor
 {
 	LidarPlaneFactor(Eigen::Vector3d curr_point_, Eigen::Vector3d last_point_j_,
@@ -99,10 +107,11 @@ struct LidarPlaneFactor
 	}
 
 	Eigen::Vector3d curr_point, last_point_j, last_point_l, last_point_m;
-	Eigen::Vector3d ljm_norm;
+	// ljm的法向量
+    Eigen::Vector3d ljm_norm;
 	double s;
 };
-
+// Mapping中点到面的残差距离
 struct LidarPlaneNormFactor
 {
 
@@ -118,7 +127,7 @@ struct LidarPlaneNormFactor
 		Eigen::Matrix<T, 3, 1> cp{T(curr_point.x()), T(curr_point.y()), T(curr_point.z())};
 		Eigen::Matrix<T, 3, 1> point_w;
 		point_w = q_w_curr * cp + t_w_curr;
-
+        // 点到面的距离 Dh=fabs(Ax0+By0+Cz0+D)/sqrt(A^2+B^2+C^2)=norm(A,B,C)*(x0,y0,z0)+D
 		Eigen::Matrix<T, 3, 1> norm(T(plane_unit_norm.x()), T(plane_unit_norm.y()), T(plane_unit_norm.z()));
 		residual[0] = norm.dot(point_w) + T(negative_OA_dot_norm);
 		return true;
