@@ -94,7 +94,9 @@ Eigen::Quaterniond q_w_curr(1, 0, 0, 0);
 Eigen::Vector3d t_w_curr(0, 0, 0);
 
 // q_curr_last(x, y, z, w), t_curr_last
+// 优化变量 四元数旋转
 double para_q[4] = {0, 0, 0, 1};
+// 优化变量 平移
 double para_t[3] = {0, 0, 0};
 
 Eigen::Map<Eigen::Quaterniond> q_last_curr(para_q);
@@ -108,6 +110,7 @@ std::queue<sensor_msgs::PointCloud2ConstPtr> fullPointsBuf;
 std::mutex mBuf;
 
 // undistort lidar point
+// 将当前帧的点云变换到采样点pi的位姿下
 void TransformToStart(PointType const *const pi, PointType *const po)
 {
     //interpolation ratio
@@ -117,6 +120,7 @@ void TransformToStart(PointType const *const pi, PointType *const po)
     else
         s = 1.0;
     //s = 1;
+    // 四元数插值
     Eigen::Quaterniond q_point_last = Eigen::Quaterniond::Identity().slerp(s, q_last_curr);
     Eigen::Vector3d t_point_last = s * t_last_curr;
     Eigen::Vector3d point(pi->x, pi->y, pi->z);
@@ -129,7 +133,6 @@ void TransformToStart(PointType const *const pi, PointType *const po)
 }
 
 // transform all lidar points to the start of the next frame
-
 void TransformToEnd(PointType const *const pi, PointType *const po)
 {
     // undistort point first
@@ -277,6 +280,7 @@ int main(int argc, char **argv)
                 TicToc t_opt;
                 for (size_t opti_counter = 0; opti_counter < 2; ++opti_counter)
                 {
+                    // 边角和平面匹配数量
                     corner_correspondence = 0;
                     plane_correspondence = 0;
 
@@ -556,7 +560,7 @@ int main(int argc, char **argv)
                     TransformToEnd(&laserCloudFullRes->points[i], &laserCloudFullRes->points[i]);
                 }
             }
-
+            // less ---> last 为下一次点云特征匹配提供target
             pcl::PointCloud<PointType>::Ptr laserCloudTemp = cornerPointsLessSharp;
             cornerPointsLessSharp = laserCloudCornerLast;
             laserCloudCornerLast = laserCloudTemp;
@@ -569,7 +573,7 @@ int main(int argc, char **argv)
             laserCloudSurfLastNum = laserCloudSurfLast->points.size();
 
             // std::cout << "the size of corner last is " << laserCloudCornerLastNum << ", and the size of surf last is " << laserCloudSurfLastNum << '\n';
-
+            // 设置kd tree 输入点云
             kdtreeCornerLast->setInputCloud(laserCloudCornerLast);
             kdtreeSurfLast->setInputCloud(laserCloudSurfLast);
 
