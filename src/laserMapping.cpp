@@ -34,6 +34,8 @@
 // ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 // POSSIBILITY OF SUCH DAMAGE.
 
+// 对Odom的位姿进行修正：利用corner less sharp和surf less flat进行scan2submap配准
+
 #include <math.h>
 #include <vector>
 #include <aloam_velodyne/common.h>
